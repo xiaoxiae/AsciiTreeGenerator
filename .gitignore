@@ -1,0 +1,5 @@
+# exported trees
+trees/*
+
+# Python cache files
+.mypy_cache
