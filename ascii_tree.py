@@ -12,7 +12,7 @@ from datetime import datetime
 class Point:
     """A class for working with points."""
 
-    def __init__(self, x, y):
+    def __init__(self, x: float = 0, y: float = 0):
         self.x = x
         self.y = y
 
@@ -21,7 +21,7 @@ class Point:
         return Point(self.x + d * cos(alpha), self.y + d * sin(alpha))
 
     def __add__(self, other):
-        """Defines addition of points as addition of their components."""
+        """Defines the addition of points as addition of their components."""
         return Point(self.x + other.x, self.y + other.y)
 
     def __str__(self) -> str:
@@ -31,7 +31,7 @@ class Point:
     __repr__ = __str__
 
     def __hash__(self):
-        """Defines the hash of a point as a hash of a (x, y) tuple."""
+        """Defines the hash of a point as a hash of an (x, y) tuple."""
         return hash(tuple(self.x, self.y))
 
     def __eq__(self, other):
@@ -39,8 +39,8 @@ class Point:
         return self.x == other.x and self.y == other.y
 
     def is_within_polygon(self, polygon: List) -> bool:
-        """Returns True if a point is within a polygon and False otherwise by casting a ray
-        and counting how many polygon line segments it hits."""
+        """Checks if a point is within a polygon by casting a ray and counting how many 
+        line segments it hits -- if the number is odd, return True (False otherwise)."""
         inside = False
 
         for i in range(-1, len(polygon) - 1):
@@ -58,135 +58,157 @@ class Point:
         return inside
 
 
-class Branch:
-    """A struct for holding information about a tree branch."""
+class Node:
+    """A class for holding information about a tree branch (i. e. a node)."""
 
     def __init__(
-        self, position=Point(0, 0), thickness: float = 1.0, direction: float = pi
+        self, position=Point(), thickness: float = 1.0, orientation: float = pi
     ):
+        # information about the state of the node
         self.position = position
         self.thickness = thickness
-        self.direction = direction
+        self.orientation = orientation
 
-        self.branches: List[Branch] = []
+        # information about the children of the node
+        self.children: List[Node] = []
 
 
 class AsciiTree:
-    """A class for generating realistic-looking ASCII trees."""
+    """A class for generating realistic-looking ASCII trees. 
+
+    PARAMETERS DESCRIPTION:
+    =======================
+
+    number_of_children (float -> int)
+    - input : current node thickness
+    - output: number of children
+
+    children_orientation_offsets (int, float -> (float,...))
+    - input : number of children, current thickness
+    - output: offsets of the directions of the branches
+
+    child_thickness (int, float -> float)
+    - input : number of children, current thickness
+    - output: thickness of a child of the node
+
+    child_distance (float -> float)
+    - input : current thickness
+    - output: distance to the child
+
+    silhouette_points_distance (float -> (float, float))
+    - input : current thickness
+    - output: distances to the left and right silhouette points
+
+    CONSTANTS DESCRIPTION:
+    ======================
+    minimum_node_thickness (float): the minimum thickness a branch can have
+    size ((float, float)): size of the resulted export image
+    """
 
     def __init__(
         self,
-        branching_factor: Callable[[float], int],
-        branching_offsets: Callable[[int, float], tuple],
-        thickness_change: Callable[[int, float], float],
-        length_from_thickness: Callable[[float], float],
+        number_of_children: Callable[[float], int],
+        children_orientation_offsets: Callable[[int, float], tuple],
+        child_thickness: Callable[[int, float], float],
+        child_distance: Callable[[float], float],
         silhouette_points_distance: Callable[[float], Tuple[float, float]],
-        minimum_branch_thickness: float,
+        minimum_node_thickness: float,
         size: Tuple[int, int],
     ):
-        """Initializes an AsciiTree object. The meaning of the parameters is as follows:
-
-        Generation-related functions (see parameter annotation for the types):
-        - branching_factor:           current thickness                               -> current number of branches
-        - branching_offsets:          current number of branches, current thickness   -> branches angle offset
-        - thickness_change:           current number of branches, current thickness   -> next thickness
-        - length_from_thickness:      current thickness                               -> distance of next branch
-        - silhouette_points_distance: current thickness                               -> distances of silhouette points
-
-        Constants (see parameter annotation for the types):
-        - minimum_branch_thickness: the minimum thickness a branch can have
-        - size: size of the resulted export image"""
-
-        self.branching_factor = branching_factor
-        self.branching_offsets = branching_offsets
-        self.thickness_change = thickness_change
-        self.length_from_thickness = length_from_thickness
+        """Initializes an AsciiTree object."""
+        self.number_of_children = number_of_children
+        self.children_orientation_offsets = children_orientation_offsets
+        self.child_thickness = child_thickness
+        self.child_distance = child_distance
         self.silhouette_points_distance = silhouette_points_distance
 
-        self.minimum_branch_thickness = minimum_branch_thickness
+        self.minimum_node_thickness = minimum_node_thickness
         self.size = size
 
-    def generate(self):
-        """Generate an Ascii tree with the given functions/restrictions."""
+    def generate(self) -> None:
+        """Generate an ASCII tree with the given functions/restrictions."""
         # generate the branches
-        self.root = Branch()
+        self.root = Node()
         self._generate_branches(self.root)
 
         # generate the silhouette from the branches
         self.silhouette: List[Point] = []
         self._generate_silhouette(self.root, self.silhouette)
 
-    def _generate_silhouette(self, branch: Branch, silhouette: List[Point]) -> None:
-        """Returns a polygon representing the silhouette of the tree."""
-        d1, d2 = self.silhouette_points_distance(branch.thickness)
+        self.picture: List[List[str]] = [
+            [" "] * self.size[1] for _ in range(self.size[0])
+        ]
+        self._generate_picture(self.picture)
 
-        # point to the left
-        silhouette.append(branch.position.move(d1, branch.direction + pi / 2))
-
-        # the rest of the points under it
-        for b in branch.branches:
-            self._generate_silhouette(b, silhouette)
-
-        # point on the right
-        silhouette.append(branch.position.move(d2, branch.direction - pi / 2))
-
-    def _generate_branches(self, branch: Branch) -> None:
+    def _generate_branches(self, branch: Node) -> None:
         """Recursively generate the branches of the tree."""
         # recursion end condition (when branches get too thin)
-        if branch.thickness < self.minimum_branch_thickness:
+        if branch.thickness < self.minimum_node_thickness:
             return
 
-        # get the number of children of the branch and their relative offsets
-        branches_count = self.branching_factor(branch.thickness)
-        offsets = self.branching_offsets(branches_count, branch.thickness)
+        # number of children and the offsets of their orientations
+        count = self.number_of_children(branch.thickness)
+        offsets = self.children_orientation_offsets(count, branch.thickness)
 
-        print(branch.thickness, branches_count)
+        for offset in offsets:
+            # create the new child of the current node
+            thickness = self.child_thickness(count, branch.thickness)
+            distance = self.child_distance(branch.thickness)
 
-        # for each branch number and its offset
-        for branch_number, direction_offset in zip(range(branches_count), offsets):
-            branch_thickness = self.thickness_change(branches_count, branch.thickness)
-            branch_length = self.length_from_thickness(branch.thickness)
-
-            new_branch = Branch(
-                branch.position.move(
-                    branch_length, branch.direction + direction_offset
-                ),
-                branch_thickness,
-                branch.direction + direction_offset,
+            new_branch = Node(
+                branch.position.move(distance, branch.orientation + offset),
+                thickness,
+                branch.orientation + offset,
             )
 
-            branch.branches.append(new_branch)
+            # append it to the neighbours of the node and recursively generate more!
+            branch.children.append(new_branch)
             self._generate_branches(new_branch)
 
-    def export(self, file_name=None, print_to_console=True):
-        """Export the file (while also possibly console-printing it in the process)."""
-        # variables for adjusting the output to file
+    def _generate_silhouette(self, branch: Node, silhouette: List[Point]) -> None:
+        """Generates a polygon representing the silhouette of the tree."""
+        d1, d2 = self.silhouette_points_distance(branch.thickness)
+
+        # firstly, add the point to the left to the polygon
+        silhouette.append(branch.position.move(d1, branch.orientation + pi / 2))
+
+        # secondly, add the rest of the points in all of its child branches
+        for child in branch.children:
+            self._generate_silhouette(child, silhouette)
+
+        # lastly, add the point to the left to the polygon
+        silhouette.append(branch.position.move(d2, branch.orientation - pi / 2))
+
+    def _generate_picture(self, picture) -> None:
+        """Generates a 2D array representing the silhouette of the tree."""
+        # variables for centering the tree within the given size
         x_min = min(self.silhouette, key=lambda p: p.x).x
         y_min = min(self.silhouette, key=lambda p: p.y).y
         x_range = max(self.silhouette, key=lambda p: p.x).x - x_min
         y_range = max(self.silhouette, key=lambda p: p.y).y - y_min
 
-        # an array of the symbols representing the tree
-        picture = [[" "] * self.size[1] for _ in range(self.size[0])]
+        for x in range(len(self.picture)):
+            for y in range(len(self.picture[x])):
+                # scale the picture x and y to the tree coordinates
+                adjusted_x = (x / self.size[0]) * x_range + x_min
+                adjusted_y = (y / self.size[1]) * y_range + y_min
 
-        # default to the current date if the file name is not specified
+                # set points in the outline of the tree to '*'
+                if Point(adjusted_x, adjusted_y).is_within_polygon(self.silhouette):
+                    picture[x][y] = "*"
+
+    def export(self, file_name=None, print_to_console=True):
+        """Export the file (while also possibly console-printing it in the process)."""
         if file_name is None:
+            # default filename to the current date
             file_name = datetime.now().strftime("trees/tree-%m-%d-%Y_%H-%M-%S.txt")
 
         with open(file_name, "w") as f:
-            for x, line in enumerate(picture):
-                for y, char in enumerate(line):
-                    adjusted_x = (x / self.size[0]) * x_range + x_min
-                    adjusted_y = (y / self.size[1]) * y_range + y_min
-
-                    if Point(adjusted_x, adjusted_y).is_within_polygon(self.silhouette):
-                        if print_to_console:
-                            print("*", end="")
-                        f.write("*")
-                    else:
-                        if print_to_console:
-                            print(" ", end="")
-                        f.write(" ")
+            for row in self.picture:
+                for char in row:
+                    if print_to_console:
+                        print(char, end="")
+                    f.write(char)
                 if print_to_console:
                     print()
                 f.write("\n")
