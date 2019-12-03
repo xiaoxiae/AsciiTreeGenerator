@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 # tree generation
 from random import random, randint, uniform
-from math import pi, sin, cos
+from math import pi, sin, cos, ceil
 
 # tree export
 from datetime import datetime
@@ -146,7 +146,7 @@ class AsciiTree:
         # lastly, add the point to the left to the polygon
         silhouette.append(branch.position.move(d2, branch.orientation - pi / 2))
 
-    def __get_picture(self) -> List[List[str]]:
+    def __get_picture(self, debug=True) -> List[List[str]]:
         """Generates a 2D array representing the ASCII tree."""
 
         picture = [[" "] * self.size[1] for _ in range(self.size[0])]
@@ -167,7 +167,42 @@ class AsciiTree:
                 if Point(adjusted_x, adjusted_y).is_within_polygon(self.silhouette):
                     picture[x][y] = "*"
 
-        return picture
+        substitutions = [
+            [("*********", " "),],
+        ]
+
+        # go through each substitution phase
+        for phase in substitutions:
+            filtered_picture = [[" "] * self.size[1] for _ in range(self.size[0])]
+
+            # for each point
+            for x in range(len(picture)):
+                for y in range(len(picture[x])):
+                    # compare the neighbourhood with the substitutions
+                    neighbours = self.__get_neighbourhood(x, y, picture)
+
+                    for pattern, substitution in phase:
+                        if neighbours == pattern:
+                            filtered_picture[x][y] = substitution
+                            break
+                    else:
+                        filtered_picture[x][y] = picture[x][y]
+
+            picture = filtered_picture
+
+        return filtered_picture
+
+    def __get_neighbourhood(self, x: int, y: int, picture: List[List[str]]) -> str:
+        """Return a string of the 9 chars positioned -1, 0, 1 points relative to both
+        x and y, else None (if some of those chars don't exist)."""
+        neighbours = ""
+
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                if 0 <= x + i < len(picture) and 0 <= y + j < len(picture[0]):
+                    neighbours += picture[x + i][y + j]
+
+        return None if len(neighbours) != 9 else neighbours
 
     def export(self, file_name: str = None, print_to_console: bool = True):
         """Export the file (while also possibly console-printing it in the process)."""
