@@ -4,7 +4,7 @@ from typing import Callable, List, Tuple, Set
 from dataclasses import dataclass, field
 
 # tree generation
-from random import random, randint, uniform
+from random import random, randint, uniform, choice
 from math import pi, sin, cos, ceil
 
 # tree export
@@ -113,7 +113,6 @@ class AsciiTree:
         if branch.thickness < self.minimum_node_thickness:
             return
 
-        # number of children and the offsets of their orientations
         children_count = self.number_of_children(branch.thickness)
         offsets = self.children_orientation_offsets(children_count, branch.thickness)
 
@@ -167,8 +166,18 @@ class AsciiTree:
                 if Point(adjusted_x, adjusted_y).is_within_polygon(self.silhouette):
                     picture[x][y] = "*"
 
+        # special symbols are:
+        # a -- anything
         substitutions = [
-            [("*********", " "),],
+            [("a*a***a*a", lambda: " "),],
+            [
+                ("a*a * a*a", lambda: choice(("|", "l"))),
+                ("a a***a a", lambda: "-"),
+                ("aa  *  aa", lambda: "\\"),
+                (" aa * aa ", lambda: "/"),
+                ("aa a*a aa", lambda: "'"),
+                ("aaaa*aaaa", lambda: choice(("o", "O", "*", "."))),
+            ],
         ]
 
         # go through each substitution phase
@@ -182,8 +191,12 @@ class AsciiTree:
                     neighbours = self.__get_neighbourhood(x, y, picture)
 
                     for pattern, substitution in phase:
-                        if neighbours == pattern:
-                            filtered_picture[x][y] = substitution
+                        # check chars one by one
+                        for c1, c2 in zip(pattern, neighbours):
+                            if c1 != "a" and c1 != c2:
+                                break
+                        else:
+                            filtered_picture[x][y] = substitution()
                             break
                     else:
                         filtered_picture[x][y] = picture[x][y]
@@ -194,13 +207,15 @@ class AsciiTree:
 
     def __get_neighbourhood(self, x: int, y: int, picture: List[List[str]]) -> str:
         """Return a string of the 9 chars positioned -1, 0, 1 points relative to both
-        x and y, else None (if some of those chars don't exist)."""
+        x and y. Add ' ' if the coordinates are out of bounds."""
         neighbours = ""
 
         for i in range(-1, 2):
             for j in range(-1, 2):
                 if 0 <= x + i < len(picture) and 0 <= y + j < len(picture[0]):
                     neighbours += picture[x + i][y + j]
+                else:
+                    neighbours += " "
 
         return None if len(neighbours) != 9 else neighbours
 
