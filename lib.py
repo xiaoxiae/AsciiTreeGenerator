@@ -4,8 +4,8 @@ from typing import Callable, List, Tuple, Set
 from dataclasses import dataclass, field
 
 # tree generation
-from random import random, randint, uniform, choice
-from math import pi, sin, cos, ceil
+from random import choice
+from math import pi, sin, cos
 
 # tree export
 from datetime import datetime
