@@ -94,6 +94,9 @@ class AsciiTree:
     minimum_node_thickness: float
     # - the minimum thickness a branch can have
 
+    substitutions: List[List[Tuple[str, Callable]]]
+    # - size of the resulted export image
+
     size: Tuple[int, int]
     # - size of the resulted export image
 
@@ -166,22 +169,8 @@ class AsciiTree:
                 if Point(adjusted_x, adjusted_y).is_within_polygon(self.silhouette):
                     picture[x][y] = "*"
 
-        # special symbols are:
-        # a -- anything
-        substitutions = [
-            [("a*a***a*a", lambda: " "),],
-            [
-                ("a*a * a*a", lambda: choice(("|", "l"))),
-                ("a a***a a", lambda: "-"),
-                ("aa  *  aa", lambda: "\\"),
-                (" aa * aa ", lambda: "/"),
-                ("aa a*a aa", lambda: "'"),
-                ("aaaa*aaaa", lambda: choice(("o", "O", "*", "."))),
-            ],
-        ]
-
         # go through each substitution phase
-        for phase in substitutions:
+        for phase in self.substitutions:
             filtered_picture = [[" "] * self.size[1] for _ in range(self.size[0])]
 
             # for each point

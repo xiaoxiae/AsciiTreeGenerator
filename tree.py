@@ -18,6 +18,17 @@ trees = {
         lambda x: x * uniform(0.5, 1),
         lambda x: (x / 2 * uniform(0.6, 0.8), x / 2 * uniform(0.6, 0.8)),
         0.1,
+        [
+            [("a*a***a*a", lambda: " "),],
+            [
+                ("a*a * a*a", lambda: choice(("|", "l"))),
+                ("a a***a a", lambda: "-"),
+                ("aa  *  aa", lambda: "\\"),
+                (" aa * aa ", lambda: "/"),
+                ("aa a*a aa", lambda: "'"),
+                ("aaaa*aaaa", lambda: choice(("o", "O", "*", "."))),
+            ],
+        ],
     ),
 }
 
