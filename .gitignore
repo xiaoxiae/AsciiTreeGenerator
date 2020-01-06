@@ -1,5 +1,6 @@
 # exported trees
 trees/*
 
-# Python cache files
+# cache
 .mypy_cache
+__pycache__/
