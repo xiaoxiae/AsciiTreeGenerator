@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 # tree generation
 from random import choice
 from math import pi, sin, cos
+from util import *
 
 # tree export
 from datetime import datetime
@@ -98,7 +99,10 @@ class AsciiTree:
     # - size of the resulted export image
 
     size: Tuple[int, int]
-    # - size of the resulted export image
+    # - size of the resulted export image (height, width)
+
+    composition: List[List[List[str]]] = field(default_factory=list)
+    # - the composition layers of the image
 
     def generate(self) -> None:
         """Generate an ASCII tree with the given functions/restrictions."""
@@ -108,7 +112,29 @@ class AsciiTree:
         self.silhouette: List[Point] = []
         self.__generate_silhouette(self.root, self.silhouette)
 
-        self.picture: List[List[str]] = self.__get_picture()
+        self.composition += self.__get_picture()
+
+    def __get_blank_layer(self):
+        """Return a blank layer of the appropriate size.."""
+        return [[" "] * self.size[1] for _ in range(self.size[0])]
+
+    def __get_blank_mask(self):
+        """Return a blank layer of the appropriate size.."""
+        return [[False] * self.size[1] for _ in range(self.size[0])]
+
+    def grass(self, max_height, chars) -> None:
+        """Generate a grass layer."""
+        heights = get_wave(self.size[1], max_height)
+
+        layer = self.__get_blank_layer()
+        mask = self.__get_blank_mask()
+
+        for column in range(self.size[1]):
+            for row in range(int(heights[column])):
+                layer[-row][column] = choice(chars)
+                mask[-row][column] = True
+
+        self.composition += [mask, layer]
 
     def __generate_branches(self, branch: Node) -> None:
         """Recursively generate the branches of the tree."""
@@ -148,10 +174,10 @@ class AsciiTree:
         # lastly, add the point to the left to the polygon
         silhouette.append(branch.position.move(d2, branch.orientation - pi / 2))
 
-    def __get_picture(self, debug=True) -> List[List[str]]:
+    def __get_picture(self, debug=True) -> List[list, list]:
         """Generates a 2D array representing the ASCII tree."""
 
-        picture = [[" "] * self.size[1] for _ in range(self.size[0])]
+        picture = self.__get_blank_layer()
 
         # variables for centering the tree within the given size
         x_min = min(self.silhouette, key=lambda p: p.x).x
@@ -169,9 +195,11 @@ class AsciiTree:
                 if Point(adjusted_x, adjusted_y).is_within_polygon(self.silhouette):
                     picture[x][y] = "*"
 
+        mask = [[c != " " for c in picture[i]] for i in range(len(picture))]
+
         # go through each substitution phase
         for phase in self.substitutions:
-            filtered_picture = [[" "] * self.size[1] for _ in range(self.size[0])]
+            filtered_picture = self.__get_blank_layer()
 
             # for each point
             for x in range(len(picture)):
@@ -192,7 +220,7 @@ class AsciiTree:
 
             picture = filtered_picture
 
-        return filtered_picture
+        return [mask, filtered_picture]
 
     def __get_neighbourhood(self, x: int, y: int, picture: List[List[str]]) -> str:
         """Return a string of the 9 chars positioned -1, 0, 1 points relative to both
@@ -208,18 +236,37 @@ class AsciiTree:
 
         return None if len(neighbours) != 9 else neighbours
 
+    def __print(self, f: file, string: str, print_to_console: bool):
+        """Print a string to the given file (and possibly to the console). Note that the
+        new line needs to be included in the string itself."""
+        f.write(string)
+
+        if print_to_console:
+            print(string, end="")
+
     def export(self, file_name: str = None, print_to_console: bool = True):
         """Export the file (while also possibly console-printing it in the process)."""
+        # default filename to the current date
         if file_name is None:
-            # default filename to the current date
-            file_name = datetime.now().strftime("trees/tree-%m-%d-%Y_%H-%M-%S.txt")
+            file_name = datetime.now().strftime("trees/%Y-%m-%d_%H-%M-%S.txt")
 
         with open(file_name, "w") as f:
-            for row in self.picture:
-                for char in row:
-                    if print_to_console:
-                        print(char, end="")
-                    f.write(char)
-                if print_to_console:
-                    print()
-                f.write("\n")
+            for row in range(self.size[0]):
+                for column in range(self.size[1]):
+                    for layer in range(len(self.composition)):
+                        char = self.composition[layer][row][column]
+
+                        if char is True:
+                            self.__print(
+                                f,
+                                self.composition[layer + 1][row][column],
+                                print_to_console,
+                            )
+                            break
+                        elif type(char) != bool and char != " ":
+                            self.__print(f, char, print_to_console)
+                            break
+                    else:
+                        self.__print(f, " ", print_to_console)
+
+                self.__print(f, "\n", print_to_console)
